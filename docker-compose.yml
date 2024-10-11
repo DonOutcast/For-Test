@@ -43,8 +43,6 @@ services:
       context: .
       target: ${TARGET:-development}
     <<: *default-settings
-#    ports:
-#      - "${PORT:-16000}:8000"
     volumes:
       - ./backend/:/app/
       - static:/app/backend/backend_static
