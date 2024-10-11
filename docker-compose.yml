@@ -1,0 +1,71 @@
+x-default-settings: &default-settings
+  env_file: ./.env
+  restart: unless-stopped
+
+x-healthcheck-interval: &hc-interval
+  interval: 2s
+  retries: 10
+  timeout: 10s
+
+x-default-logging: &default-logging
+  options:
+    max-size: '10m'
+    max-file: '3'
+  driver: json-file
+
+
+volumes:
+  static:
+
+services:
+
+  django_nginx:
+    build:
+      context: devops/nginx/
+      dockerfile: Dockerfile
+    container_name: django_nginx
+    restart: always
+    logging: *default-logging
+    depends_on:
+      django_db:
+        condition: service_healthy
+
+    profiles:
+      - all
+    ports:
+      - 80:80
+    volumes:
+      - static:/staticfiles
+
+  django_service:
+    container_name: django_service
+    build:
+      context: .
+      target: ${TARGET:-development}
+    <<: *default-settings
+#    ports:
+#      - "${PORT:-16000}:8000"
+    volumes:
+      - ./backend/:/app/
+      - static:/app/backend/backend_static
+    healthcheck:
+      test: ["CMD",  "wget -qO- http://localhost:8070/healthcheck || exit 1"]
+      <<: *hc-interval
+    depends_on:
+      django_db:
+        condition: service_healthy
+    tty: true
+    profiles:
+      - all
+
+  django_db:
+    container_name: django_db
+    image: postgres:15.3-bullseye
+    <<: *default-settings
+    ports:
+      - "${POSTGRES_PORT:-16010}:5432"
+    healthcheck:
+      <<: *hc-interval
+      test: [ "CMD-SHELL", "pg_isready -U postgres" ]
+    profiles:
+      - all
